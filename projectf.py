@@ -89,38 +89,56 @@ import streamlit as st
 import cohere
 
 
+
 # Initialize Cohere client
+COHERE_API_KEY = 'YOUR_COHERE_API_KEY'
 co = cohere.Client('pGbElaDbFkEHelKRVKyQG6QoTB14XF4iQ0iOMEqP')
 
+# Load dataset
+def load_data(file_path):
+    return pd.read_csv(file_path)
 
-def fetch_comments(video_id):
-    comments = []
-    results = youtube.commentThreads().list(
-        part="snippet",
-        videoId=video_id,
-        textFormat="plainText"
-    ).execute()
-
-    for item in results['items']:
-        comment = item['snippet']['topLevelComment']['snippet']['textDisplay']
-        comments.append(comment)
-
-    return comments
-
-def detect_spam(comment):
+# Predict function using Cohere
+def predict_spam(text):
     response = co.classify(
-        model='large',  # Change to your specific model if needed
-        inputs=[comment]
+        model='large',
+        inputs=[text],
+        examples=[
+            cohere.classify.Example("Buy now and get 50% off!", "spam"),
+            cohere.classify.Example("Check out my new video!", "spam"),
+            cohere.classify.Example("This video was really helpful, thanks!", "not spam"),
+            cohere.classify.Example("I loved the part where you explained the code.", "not spam")
+            # Add more examples for better accuracy
+        ]
     )
-    return response.classifications[0].prediction == 'spam'
+    return response.classifications[0].prediction
 
-# Streamlit UI
-st.title("YouTube Comment Spam Detector")
+# Streamlit app
+st.title('YouTube Spam Comments Detector')
+st.write('Upload a CSV file containing comments and their labels.')
 
-video_id = st.text_input("Enter YouTube Video ID:")
+uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 
-if video_id:
-    comments = fetch_comments(video_id)
+if uploaded_file is not None:
+    data = load_data(uploaded_file)
+    st.write(data.head())
+
+    st.write('Predict spam for new comment:')
+    user_comment = st.text_area("Enter a YouTube comment")
+
+    if st.button('Predict'):
+        if user_comment:
+            prediction = predict_spam(user_comment)
+            st.write(f'This comment is predicted to be: **{prediction}**')
+        else:
+            st.write('Please enter a comment to predict.')
+else:
+    st.write('Please upload a CSV file to proceed.')
+
+# To run the app, use the following command in the terminal:
+# streamlit run your_script_name.py
+
+
     st.write("Fetched Comments:")
     for comment in comments:
         is_spam = detect_spam(comment)
